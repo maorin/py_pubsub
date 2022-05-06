@@ -30,15 +30,32 @@ from object_detection.utils import config_util
 from object_detection.utils import visualization_utils as viz_utils
 from object_detection.builders import model_builder
 from scipy.optimize import linear_sum_assignment
-
+import base64
 from py_pubsub import sort
+
 
 
 ros_coordinates = []
 
-   
+ros_tracks_detections =  [] 
     
-    
+def numpy_to_bytes(arr: np.array) -> str:
+    arr_dtype = bytearray(str(arr.dtype), 'utf-8')
+    arr_shape = bytearray(','.join([str(a) for a in arr.shape]), 'utf-8')
+    sep = bytearray('|', 'utf-8')
+    arr_bytes = arr.ravel().tobytes()
+    to_return = arr_dtype + sep + arr_shape + sep + arr_bytes
+    return to_return
+
+def bytes_to_numpy(serialized_arr: str) -> np.array:
+    sep = '|'.encode('utf-8')
+    i_0 = serialized_arr.find(sep)
+    i_1 = serialized_arr.find(sep, i_0 + 1)
+    arr_dtype = serialized_arr[:i_0].decode('utf-8')
+    arr_shape = tuple([int(a) for a in serialized_arr[i_0 + 1:i_1].decode('utf-8').split(',')])
+    arr_str = serialized_arr[i_1 + 1:]
+    arr = np.frombuffer(arr_str, dtype = arr_dtype).reshape(arr_shape)
+    return arr    
 
 
 class MinimalPublisher(Node):
@@ -274,20 +291,24 @@ class MinimalPublisher(Node):
                         "class_name": category_index[class_id]["name"],
                         "score": scores[i]
                     })
-                    det_list = np.array([[0, 0, 1, 1, 0.01]])
-                    x =  boxes[i][0] * 2336
-                    y = boxes[i][1] * 1080
-                    width = boxes[i][2] * 2336  - x
-                    height = boxes[i][3] * 1080 - y
-                    score = scores[i]
-                    det_list = np.vstack((det_list, \
-                        [x, y, x+width, y+height, score]))                                     
-                    tracks_detections.append(det_list)
+                    if category_index[class_id]["name"] == "person":
+                        det_list = np.array([[boxes[i][0], boxes[i][1], boxes[i][2], boxes[i][3], 0.01]])
+                        x =  boxes[i][0] * 2336
+                        y = boxes[i][1] * 1080
+                        width = boxes[i][2] * 2336  - x
+                        height = boxes[i][3] * 1080 - y
+                        score = scores[i]
+                        det_list = np.vstack((det_list, \
+                            [x, y, x+width, y+height, score]))
+                        print("1111111")
+                        print(det_list)                                 
+                        print("1111111")
+                        tracks_detections.append(det_list)
             
             
             #print(coordinates)
-            ros_coordinates = coordinates
-            print(len(ros_coordinates))
+            #ros_coordinates = coordinates
+            #print(len(ros_coordinates))
             #print()   
         
             # Display output
@@ -314,7 +335,7 @@ class MinimalPublisher(Node):
                         
             """
             
-            
+            data = []
             
             for det_list in tracks_detections:
                 # Call the tracker
@@ -323,7 +344,8 @@ class MinimalPublisher(Node):
                 # Copy the detections
                 detections_copy = tracks_detections
         
-                detections = []
+                #detections = []
+                
         
                 if len(det_list) > 0:
         
@@ -345,14 +367,50 @@ class MinimalPublisher(Node):
         
                             #detections_copy[j-1].id = int(tracks[i, 4])
         
-                            detections.append(detections_copy[j-1])
+                            #detections.append(detections_copy[j-1])
+                            
+                            """
+                            >>> aa = np.array([1.220,33.33,444.222])
+                            >>> aa
+                            array([  1.22 ,  33.33 , 444.222])
+                            >>> base64.b64encode(aa)
+                            b'hetRuB6F8z8K16NwPapAQGQ730+Nw3tA'
+                            >>> cc = base64.b64encode(aa)
+                            >>> dd = cc.decode("utf-8")
+                            >>> dd
+                            'hetRuB6F8z8K16NwPapAQGQ730+Nw3tA'
+                            >>> ff = dd.encode("utf-8")
+                            >>> xx = base64.b64decode(ff)
+                            >>> 
+                            >>> xx
+                            b'\x85\xebQ\xb8\x1e\x85\xf3?\n\xd7\xa3p=\xaa@@d;\xdfO\x8d\xc3{@'
+                            >>> np.frombuffer(xx, dtype=np.float64)
+                            array([  1.22 ,  33.33 , 444.222])
+                            >>> 
+                            """
+                            
+                            bbb = base64.b64encode(np.around(detections_copy[j-1][0],4)).decode("utf-8")
+                            ccc = base64.b64encode(np.around(detections_copy[j-1][1],4)).decode("utf-8")
+                            
+                            d = {
+                                "id": "{}".format(tracks[i, 4]),
+                                "coordinates": bbb,
+                                "tracks_coordinates": ccc,
+                                "cost": "{}".format(C[i,j])
+                            }
+
+                            
+                            
+                            data.append(d)
         
                     print("------------")
         
         
                 else:
                     print("No tracked objects!")
-    
+                    
+            
+            ros_coordinates = data
             #self.pub_trackers.publish(detections)
     
     
@@ -366,8 +424,21 @@ class MinimalPublisher(Node):
         cap.release()
         cv2.destroyAllWindows()        
 
-
     def timer_callback(self):
+        global ros_coordinates
+        msg = String()
+        #msg.data = 'Hello World: %d' % self.i
+        #print(ros_coordinates)
+        print(len(ros_coordinates))
+        if ros_coordinates:
+            d = json.dumps(ros_coordinates)
+            msg.data = d
+            self.publisher_.publish(msg)
+            self.get_logger().info('Publishing: "%s"' % msg.data)
+            self.i += 1
+
+
+    def timer_callback1(self):
         global ros_coordinates
         msg = String()
         #msg.data = 'Hello World: %d' % self.i
