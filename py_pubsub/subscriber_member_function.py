@@ -22,7 +22,8 @@ from chameleon.config import TRUE
 import json
 import base64
 
-
+from shapely.geometry import LineString
+from shapely.geometry import Point
 
 # 2336x1080 屏幕长宽
 # 1168x 540 中心点
@@ -82,6 +83,9 @@ class MinimalSubscriber(Node):
         print(tcoo)
 
         rect = np.array(coo[0:4]) * np.array([2336, 1080, 2236, 1080])
+        self.target_point_X = int((rect[2] - rect[0]) / 2)  + rect[0]
+        self.target_point_Y = int((rect[3] - rect[1]) / 2)  + rect[1]
+        
         print(rect)
         if (rect[0] < 1168 < rect[2]) and (rect[1] < 540 < rect[3]):
             print("ready go")
@@ -120,7 +124,76 @@ class MinimalSubscriber(Node):
         
         self.target_enemy = {}
         self.target_data = ""
+        self.target_point_X = None
+        self.target_point_Y = None
         
+    def open_fire(self):
+        pass
+    
+    """
+    2D游戏 瞄准功能
+    已知 
+       1. 手点的位置 固定 (1685, 319)
+       2. 准点 (1168, 540)
+       3. 目标  目标检测中心点
+       
+    已知三个点 求平行4边形的第4个点  这样会有3个平行4边形。
+    排除2个  排除方法  因为准心X轴点  一直小于 手点 所以只有两个可能 
+
+
+        point4.x = point1.x + (point3.x - point2.x) 
+        point4.y = point1.y + (point3.y - point2.y) 
+        顺便说一句，给定 3 个点，您可以构建三个平行四边形，另外两个由下式给出
+        
+        point4.x = point2.x + (point1.x - point3.x) 
+        point4.y = point2.y + (point1.y - point3.y) 
+        和
+        
+        point4.x = point3.x + (point2.x - point1.x) 
+        point4.y = point3.y + (point2.y - point1.y) 
+
+
+
+        from shapely.geometry import LineString
+        from shapely.geometry import Point
+        
+        p = Point(5,5)
+        c = p.buffer(3).boundary
+        l = LineString([(0,0), (10, 10)])
+        i = c.intersection(l)
+        
+        print i.geoms[0].coords[0]
+        (2.8786796564403576, 2.8786796564403576)
+        
+        print i.geoms[1].coords[0]
+        (7.121320343559642, 7.121320343559642)
+
+        如果有一个交点直接
+        >>> i.coords[0]
+        (7.121320343559642, 7.121320343559642)
+
+
+       第一条线：  手点的准置到准心 
+      第二条线： 准心到目标。
+      求手和准心到目标的平行线上的点 优化距离和速度
+    """
+    def aim_target(self):
+        #如果目标在右边  点要大
+        if self.target_point_X > 1168:
+            print("%s rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr" % self.target_point_X)
+            line_x = self.target_point_X + (1685 - 1168)
+            line_y = self.target_point_Y + (319 - 540)
+        else:
+            print("%s llllllllllllllllllllllllllllllllllllllllllllllllll" % self.target_point_X)
+            line_x = 1685 + (self.target_point_X - 1168)
+            line_y = 319 +  (self.target_point_Y - 540)            
+        
+        p = Point(1685,319)
+        c = p.buffer(30).boundary
+        l = LineString([(1685,319), (line_x, line_y)])
+        i = c.intersection(l)
+        print("xxxxxxxxxxxxxxxxxxxxxx  goal: X: %s  Y: %s" % (int(i.coords[0][0]), int(i.coords[0][1])))
+        sildes(1685, 319, int(i.coords[0][0]), int(i.coords[0][1]), 50)
     
     def listener_callback(self, msg):
         self.get_logger().info('I heard: "%s"' % msg.data)
@@ -130,14 +203,11 @@ class MinimalSubscriber(Node):
         self.target_enemy = self.find_target_enemy(msg.data)
         
         #判断中心点 是否在矩形内
-        
-        if not self.point_inside_rect(self.target_enemy):
-            pass
-            #self.aim_target()       
-        """
-        if self.point_inside_rect(self.target_data):
+        if self.point_inside_rect(self.target_enemy):
             self.open_fire()
-        """
+        else:  
+            self.aim_target()       
+
         
         
 
