@@ -29,6 +29,11 @@ from shapely.geometry import Point
 # 1168x 540 中心点
 # 手动测试 50有反应
 #ros@ros:~$ adb shell input swipe 2335 1  2300 50 50
+HAND_X = 1685
+HAND_Y = 319
+
+AIM_X = 1168
+AIM_Y = 540
 
 def sildes(x, y, x1, y1, h):
     os.system('adb shell input swipe {} {} {} {} {}'.format(x, y, x1, y1, h))
@@ -126,6 +131,7 @@ class MinimalSubscriber(Node):
         self.target_data = ""
         self.target_point_X = None
         self.target_point_Y = None
+        self.done = False
         
     def open_fire(self):
         pass
@@ -179,21 +185,27 @@ class MinimalSubscriber(Node):
     """
     def aim_target(self):
         #如果目标在右边  点要大
-        if self.target_point_X > 1168:
-            print("%s rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr" % self.target_point_X)
-            line_x = self.target_point_X + (1685 - 1168)
-            line_y = self.target_point_Y + (319 - 540)
+        if self.target_point_X > AIM_X:
+            line_x = HAND_X + (self.target_point_X - AIM_X)
         else:
-            print("%s llllllllllllllllllllllllllllllllllllllllllllllllll" % self.target_point_X)
-            line_x = 1685 + (self.target_point_X - 1168)
-            line_y = 319 +  (self.target_point_Y - 540)            
+            line_x = HAND_X - (AIM_X - self.target_point_X)
+            
+        if self.target_point_Y > AIM_Y:
+            line_y = HAND_Y + (self.target_point_Y - AIM_Y)
+        else:
+            line_y = HAND_Y - (AIM_Y - self.target_point_Y)
+            
+        print("目标点是：(%s %s) 手要移动的点：(%s %s)" % (self.target_point_X, self.target_point_Y, line_x, line_y))
+        p = Point(HAND_X,HAND_Y)
         
-        p = Point(1685,319)
+        #TODO 换算DPI 移动的距离
         c = p.buffer(30).boundary
-        l = LineString([(1685,319), (line_x, line_y)])
+        l = LineString([(HAND_X,HAND_Y), (line_x, line_y)])
         i = c.intersection(l)
         print("xxxxxxxxxxxxxxxxxxxxxx  goal: X: %s  Y: %s" % (int(i.coords[0][0]), int(i.coords[0][1])))
-        sildes(1685, 319, int(i.coords[0][0]), int(i.coords[0][1]), 50)
+        sildes(HAND_X, HAND_Y, int(i.coords[0][0]), int(i.coords[0][1]), 50)
+        
+        self.done = True
     
     def listener_callback(self, msg):
         self.get_logger().info('I heard: "%s"' % msg.data)
@@ -205,7 +217,7 @@ class MinimalSubscriber(Node):
         #判断中心点 是否在矩形内
         if self.point_inside_rect(self.target_enemy):
             self.open_fire()
-        else:  
+        else:
             self.aim_target()       
 
         
