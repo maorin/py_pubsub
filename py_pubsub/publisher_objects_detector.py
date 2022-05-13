@@ -69,7 +69,7 @@ class MinimalPublisher(Node):
         
         
         self.publisher_ = self.create_publisher(String, 'topic', 10)
-        timer_period = 0.5  # seconds
+        timer_period = 0.4  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
         self.i = 0
         x = threading.Thread(target=self.objects_detector, args=(1,))
@@ -312,7 +312,7 @@ class MinimalPublisher(Node):
             #print()   
         
             # Display output
-            #cv2.imshow('object detection', cv2.resize(image_np_with_detections, (1024, 472)))
+            cv2.imshow('object detection', cv2.resize(image_np_with_detections, (1024, 472)))
     
     
             """

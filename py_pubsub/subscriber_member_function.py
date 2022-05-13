@@ -198,8 +198,10 @@ class MinimalSubscriber(Node):
         print("目标点是：(%s %s) 手要移动的点：(%s %s)" % (self.target_point_X, self.target_point_Y, line_x, line_y))
         p = Point(HAND_X,HAND_Y)
         
+        dis = p.distance(Point(line_x, line_y))
         #TODO 换算DPI 移动的距离
-        c = p.buffer(30).boundary
+        
+        c = p.buffer(40).boundary
         l = LineString([(HAND_X,HAND_Y), (line_x, line_y)])
         i = c.intersection(l)
         print("xxxxxxxxxxxxxxxxxxxxxx  goal: X: %s  Y: %s" % (int(i.coords[0][0]), int(i.coords[0][1])))
